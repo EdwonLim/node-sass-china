@@ -1,25 +1,25 @@
 {
-  "name": "node-sass",
+  "name": "node-sass-china",
   "version": "3.2.0",
   "libsass": "3.2.5",
-  "description": "Wrapper around libsass",
+  "description": "Wrapper around libsass (国情，不翻墙版)",
   "license": "MIT",
-  "homepage": "https://github.com/sass/node-sass",
+  "homepage": "https://github.com/EdwonLim/node-sass-china",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sass/node-sass"
+    "url": "https://github.com/EdwonLim/node-sass-china"
   },
   "author": {
-    "name": "Andrew Nesbitt",
-    "email": "andrewnez@gmail.com",
-    "url": "http://andrew.github.com"
+    "name": "Edwon Lim",
+    "email": "Edwon.Lim@gmail.com",
+    "url": "http://ued.qunar.com"
   },
   "engines": {
     "node": ">=0.10.0"
   },
   "main": "lib/index.js",
   "nodeSassConfig": {
-    "binarySite": "https://github.com/sass/node-sass/releases/download"
+    "binarySite": "http://ued.qunar.com/node-sass/release"
   },
   "bin": {
     "node-sass": "bin/node-sass"
