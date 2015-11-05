@@ -3,7 +3,7 @@
 <table>
   <tr>
     <td>
-      <img width="100%" alt="Sass logo" src="https://rawgit.com/sass/node-sass/master/media/logo.svg" />
+      <img width="77px" alt="Sass logo" src="https://rawgit.com/sass/node-sass/master/media/logo.svg" />
     </td>
     <td valign="bottom" align="right">
       <a href="https://nodei.co/npm/node-sass/">
@@ -96,7 +96,7 @@ Starting from v3.0.0:
 
 * `this` refers to a contextual scope for the immediate run of `sass.render` or `sass.renderSync`
 
-* importers can return error and LibSass will emit that error in repsonse. For instance:
+* importers can return error and LibSass will emit that error in response. For instance:
 
   ```javascript
   done(new Error('doesn\'t exist!'));
@@ -104,7 +104,7 @@ Starting from v3.0.0:
   return new Error('nothing to do here');
   ```
 
-* importer can be an array of functions, which will be called by libsass in the order of their occurance in array. This helps user specify special importer for particular kind of path (filesystem, http). If an importer does not want to handle a particular path, it should return `sass.NULL`. See [functions section](#functions--v300) for more details on Sass types.
+* importer can be an array of functions, which will be called by libsass in the order of their occurrence in array. This helps user specify special importer for particular kind of path (filesystem, http). If an importer does not want to handle a particular path, it should return `sass.NULL`. See [functions section](#functions--v300) for more details on Sass types.
 
 ### functions (>= v3.0.0) - _experimental_
 
@@ -183,6 +183,8 @@ Default: `false`
 
 `true` values enable [Sass Indented Syntax](http://sass-lang.com/documentation/file.INDENTED_SYNTAX.html) for parsing the data string or file.
 
+__Note:__ node-sass/libsass will compile a mixed library of scss and indented syntax (.sass) files with the Default setting (false) as long as .sass and .scss extensions are used in filenames.
+
 ### indentType (>= v3.0.0)
 Type: `String`
 Default: `space`
@@ -216,6 +218,26 @@ Default: `null`
 
 Specify the intended location of the output file. Strongly recommended when outputting source maps so that they can properly refer back to their intended files.
 
+**Attention** enabling this option will **not** write the file on disk for you, it's for internal reference purpose only (to generate the map for example).
+
+Example on how to write it on the disk
+```javascript
+sass.render({
+    ...
+    outFile: yourPathTotheFile,
+  }, function(error, result) { // node-style callback from v3.0.0 onwards
+    if(!error){
+      // No errors during the compilation, write this result on the disk
+      fs.writeFile(yourPathTotheFile, result.css, function(err){
+        if(!err){
+          //f ile written on disk
+        }
+      });
+    }
+  });
+});
+```
+
 ### outputStyle
 Type: `String`
 Default: `nested`
@@ -240,7 +262,7 @@ Type: `Boolean | String | undefined`
 Default: `undefined`
 **Special:** Setting the `sourceMap` option requires also setting the `outFile` option
 
-Enables the outputting of a source map during `render` and `renderSync`. When `sourceMap === true`, the value of `outFile` is used as the target output location for the source map. When `typeof sourceMap === "String"`, the value of `sourceMap` will be used as the writing location for the file.
+Enables the outputting of a source map during `render` and `renderSync`. When `sourceMap === true`, the value of `outFile` is used as the target output location for the source map. When `typeof sourceMap === "string"`, the value of `sourceMap` will be used as the writing location for the file.
 
 ### sourceMapContents
 Type: `Boolean`
@@ -294,7 +316,7 @@ sass.render({
     // this.options contains this options hash, this.callback contains the node-style callback
     someAsyncFunction(url, prev, function(result){
       done({
-        file: result.path, // only one of them is required, see section Sepcial Behaviours.
+        file: result.path, // only one of them is required, see section Special Behaviours.
         contents: result.data
       });
     });
@@ -342,7 +364,7 @@ var result = sass.renderSync({
     // OR
     var result = someSyncFunction(url, prev);
     return {file: result.path, contents: result.data};
-  },
+  }
 }));
 
 console.log(result.css);
@@ -448,11 +470,11 @@ node scripts/build -f  # use -d switch for debug release
 
 The interface for command-line usage is fairly simplistic at this stage, as seen in the following usage section.
 
-Output will be saved with the same name as input SASS file into the current working directory if it's omitted.
+Output will be saved with the same name as input Sass file into the current working directory if the `--output` flag is omitted.
 
 ### Usage
- `node-sass [options] <input.scss> [output.css]`
- `cat <input.scss> | node-sass > output.css`
+ `node-sass [options] <input> [output]`
+ `cat <input> | node-sass > output`
 
  **Options:**
 
@@ -474,17 +496,41 @@ Output will be saved with the same name as input SASS file into the current work
     --source-map-embed         Embed sourceMappingUrl as data URI
     --source-map-root          Base path, will be emitted in source-map as is
     --include-path             Path to look for imported files
+    --follow                   Follow symlinked directories
     --precision                The amount of precision allowed in decimal numbers
     --importer                 Path to .js file containing custom importer
     --functions                Path to .js file containing custom functions
     --help                     Print usage info
 ```
 
-Pass a directory as the input to compile multiple files. For example: `node-sass sass/ -o css/`. The `--output` flag is required and must be a directory when using multi-file compilation.
+The `input` can be either a single `.scss` or `.sass`, or a directory. If the input is a directory the `--output` flag must also be supplied.
 
 Also, note `--importer` takes the (absolute or relative to pwd) path to a js file, which needs to have a default `module.exports` set to the importer function. See our test [fixtures](https://github.com/sass/node-sass/tree/974f93e76ddd08ea850e3e663cfe64bb6a059dd3/test/fixtures/extras) for example.
 
-The source-map option accepts `true` as value, in which case it replaces destination extension with `.css.map`. It also accepts path to `.map` file and even path to the desired directory. In case of multi-file compilation path to `.map` yields error.
+The `--source-map` option accepts a boolean value, in which case it replaces destination extension with `.css.map`. It also accepts path to `.map` file and even path to the desired directory.
+When compiling a directory `--source-map` can either be a boolean value or a directory.
+
+## Binary configuration parameters
+
+node-sass supports different configuration parameters to change settings related to the sass binary such as binary name, binary path or alternative download path. Following parameters are supported by node-sass:
+
+Variable name    | .npmrc parameter | Process argument   | Value
+-----------------|------------------|--------------------|------
+SASS_BINARY_NAME | sass_binary_name | --sass-binary-name | path
+SASS_BINARY_SITE | sass_binary_site | --sass-binary-site | URL
+SASS_BINARY_PATH | sass_binary_path | --sass-binary-path | path
+
+These parameters can be used as environment variable:
+
+* E.g. `export SASS_BINARY_SITE=http://example.com/`
+
+As local or global [.npmrc](https://docs.npmjs.com/misc/config) configuration file:
+
+* E.g. `sass_binary_site=http://example.com/`
+
+As a process argument:
+
+* E.g. `npm install node-sass --SASS_BINARY_SITE=http://example.com/`
 
 ## Post-install Build
 
@@ -520,4 +566,4 @@ We <3 our contributors! A special thanks to all those who have clocked in some d
 
 Copyright (c) 2015 Andrew Nesbitt. See [LICENSE](https://github.com/sass/node-sass/blob/master/LICENSE) for details.
 
-[libsass]: https://github.com/hcatlin/libsass
+[libsass]: https://github.com/sass/libsass

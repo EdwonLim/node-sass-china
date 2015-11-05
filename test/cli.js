@@ -7,9 +7,22 @@ var assert = require('assert'),
     stream = require('stream'),
     spawn = require('cross-spawn'),
     cli = path.join(__dirname, '..', 'bin', 'node-sass'),
-    fixture = path.join.bind(null, __dirname, 'fixtures');
+    fixture = path.join.bind(null, __dirname, 'fixtures'),
+    LIBSASS_VERSION = null;
 
 describe('cli', function() {
+  
+  before(function(done) {
+      var bin = spawn(cli, ['-v']);
+      bin.stdout.setEncoding('utf8');
+      bin.stdout.once('data', function(data) {
+        LIBSASS_VERSION = data.trim().split(['\n'])
+          .filter(function(a) { return a.substr(0,7) === 'libsass'; })[0]
+          .split('\t')[1];
+        done();
+      });
+  });
+
   describe('node-sass < in.scss', function() {
     it('should read data from stdin', function(done) {
       var src = fs.createReadStream(fixture('simple/index.scss'));
@@ -288,9 +301,9 @@ describe('cli', function() {
       }, 500);
     });
 
-    it('should watch the full sass dep tree for a single file', function(done) {
+    it.skip('should watch the full scss dep tree for a single file (scss)', function(done) {
       var src = fixture('watching/index.scss');
-      var foo = fixture('watching/foo.scss');
+      var foo = fixture('watching/white.scss');
 
       fs.writeFileSync(foo, '');
 
@@ -301,19 +314,44 @@ describe('cli', function() {
 
       bin.stdout.setEncoding('utf8');
       bin.stdout.once('data', function(data) {
-        assert(data.trim() === 'body{background:white}');
+        assert.equal(data.trim(), 'body{background:blue}');
         bin.kill();
         done();
       });
 
       setTimeout(function() {
-        fs.appendFileSync(foo, 'body{background:white}\n');
+        fs.appendFileSync(foo, 'body{background:blue}\n');
       }, 500);
     });
 
+    it.skip('should watch the full sass dep tree for a single file (sass)', function(done) {
+      var src = fixture('watching/index.sass');
+      var foo = fixture('watching/bar.sass');
+
+      fs.writeFileSync(foo, '');
+
+      var bin = spawn(cli, [
+        '--output-style', 'compressed',
+        '--watch', src
+      ]);
+
+      bin.stdout.setEncoding('utf8');
+      bin.stdout.once('data', function(data) {
+        assert.equal(data.trim(), 'body{background:red}');
+        bin.kill();
+        done();
+      });
+
+      setTimeout(function() {
+        fs.appendFileSync(foo, 'body\n\tbackground: red\n');
+      }, 500);
+    });
+  });
+
+  describe('node-sass --output directory', function() {
     it('should watch whole directory', function(done) {
-      var destDir = fixture('watching-css-out/');
-      var srcDir = fixture('watching-dir/');
+      var destDir = fixture('watching-css-out-01/');
+      var srcDir = fixture('watching-dir-01/');
       var srcFile = path.join(srcDir, 'index.scss');
 
       fs.writeFileSync(srcFile, '');
@@ -330,15 +368,14 @@ describe('cli', function() {
           bin.kill();
           var files = fs.readdirSync(destDir);
           assert.deepEqual(files, ['index.css']);
-          rimraf.sync(destDir);
-          done();
+          rimraf(destDir, done);
         }, 200);
       }, 500);
     });
 
     it('should compile all changed files in watched directory', function(done) {
-      var destDir = fixture('watching-css-out/');
-      var srcDir = fixture('watching/');
+      var destDir = fixture('watching-css-out-02/');
+      var srcDir = fixture('watching-dir-02/');
       var srcFile = path.join(srcDir, 'foo.scss');
 
       fs.writeFileSync(srcFile, '');
@@ -355,8 +392,7 @@ describe('cli', function() {
           bin.kill();
           var files = fs.readdirSync(destDir);
           assert.deepEqual(files, ['foo.css', 'index.css']);
-          rimraf.sync(destDir);
-          done();
+          rimraf(destDir, done);
         }, 200);
       }, 500);
     });
@@ -376,6 +412,10 @@ describe('cli', function() {
     });
 
     it('should compile with the --source-map option', function(done) {
+      if (LIBSASS_VERSION < '3.3') {
+        this.skip('Source map functionality broken in libsass < 3.3');
+      }
+
       var src = fixture('source-map/index.scss');
       var destCss = fixture('source-map/index.css');
       var destMap = fixture('source-map/index.map');
@@ -429,6 +469,26 @@ describe('cli', function() {
         fs.unlinkSync(destMap);
         done();
       });
+    });
+
+    it('should compile with the --source-map-embed option and no outfile', function(done) {
+        var src = fixture('source-map-embed/index.scss');
+        var expectedCss = read(fixture('source-map-embed/expected.css'), 'utf8').trim().replace(/\r\n/g, '\n');
+        var result = '';
+        var bin = spawn(cli, [
+          src,
+          '--source-map-embed',
+          '--source-map', 'true'
+        ]);
+        
+        bin.stdout.on('data', function(data) {
+            result += data;
+        });
+
+        bin.once('close', function() {
+          assert.equal(result.trim().replace(/\r\n/g, '\n'), expectedCss);
+          done();
+        });
     });
   });
 
@@ -548,6 +608,32 @@ describe('cli', function() {
       });
     });
 
+  });
+
+  describe('node-sass --follow --output output-dir input-dir', function() {
+    it('should compile with the --follow option', function(done) {
+      var src = fixture('follow/input-dir');
+      var dest = fixture('follow/output-dir');
+
+      fs.mkdirSync(src);
+      fs.symlinkSync(path.join(path.dirname(src), 'foo'), path.join(src, 'foo'), 'dir');
+
+      var bin = spawn(cli, [src, '--follow', '--output', dest]);
+
+      bin.once('close', function() {
+        var expected = path.join(dest, 'foo/bar/index.css');
+        fs.unlinkSync(path.join(src, 'foo'));
+        fs.rmdirSync(src);
+        assert(fs.existsSync(expected));
+        fs.unlinkSync(expected);
+        expected = path.dirname(expected);
+        fs.rmdirSync(expected);
+        expected = path.dirname(expected);
+        fs.rmdirSync(expected);
+        fs.rmdirSync(dest);
+        done();
+      });
+    });
   });
 
   describe('importer', function() {

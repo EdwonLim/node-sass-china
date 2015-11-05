@@ -7,6 +7,7 @@ var assert = require('assert'),
     resolveFixture = path.resolve.bind(null, __dirname, 'fixtures');
 
 describe('api', function() {
+
   describe('.render(options, callback)', function() {
     it('should compile sass to css with file', function(done) {
       var expected = read(fixture('simple/expected.css'), 'utf8').trim();
@@ -72,6 +73,22 @@ describe('api', function() {
         data: src
       }, function(error, result) {
         assert.equal(result.css.toString().trim(), expected.replace(/\r\n/g, '\n'));
+        done();
+      });
+    });
+
+    it('should NOT compile empty data string', function(done) {
+      sass.render({
+        data: ''
+      }, function(error) {
+        assert.equal(error.message, 'No input specified: provide a file name or a source string to process');
+        done();
+      });
+    });
+
+    it('should NOT compile without parameters', function(done) {
+      sass.render({ }, function(error) {
+        assert.equal(error.message, 'No input specified: provide a file name or a source string to process');
         done();
       });
     });
@@ -168,6 +185,29 @@ describe('api', function() {
 
   describe('.render(importer)', function() {
     var src = read(fixture('include-files/index.scss'), 'utf8');
+
+    it('should still call the next importer with the resolved prev path when the previous importer returned both a file and contents property - issue #1219', function(done) {
+      sass.render({
+        data: '@import "a";',
+        importer: function(url, prev, done) {
+          if (url === 'a') {
+            done({
+              file: '/Users/me/sass/lib/a.scss',
+              contents: '@import "b"'
+            });
+          } else {
+          console.log(prev);
+            assert.equal(prev, '/Users/me/sass/lib/a.scss');
+            done({
+              file: '/Users/me/sass/lib/b.scss',
+              contents: 'div {color: yellow;}'
+            });
+          }
+        }
+      }, function() {
+        done();
+      });
+    });
 
     it('should override imports with "data" as input and fires callback with file and contents', function(done) {
       sass.render({
@@ -769,6 +809,50 @@ describe('api', function() {
       });
     });
 
+    describe('should properly bubble up errors from sass color constructor', function() {
+      it('four booleans', function(done) {
+        sass.render({
+          data: 'div { color: foo(); }',
+          functions: {
+            'foo()': function() {
+              return new sass.types.Color(false, false, false, false);
+            }
+          }
+        }, function(error) {
+          assert.ok(/Constructor arguments should be numbers exclusively/.test(error.message));
+          done();
+        });
+      });
+
+      it('two arguments', function(done) {
+        sass.render({
+          data: 'div { color: foo(); }',
+          functions: {
+            'foo()': function() {
+              return sass.types.Color(2,3);
+            }
+          }
+        }, function(error) {
+          assert.ok(/Constructor should be invoked with either 0, 1, 3 or 4 arguments/.test(error.message));
+          done();
+        });
+      });
+
+      it('single string argument', function(done) {
+        sass.render({
+          data: 'div { color: foo(); }',
+          functions: {
+            'foo()': function() {
+              return sass.types.Color('foo');
+            }
+          }
+        }, function(error) {
+          assert.ok(/Only argument should be an integer/.test(error.message));
+          done();
+        });
+      });
+    });
+
     it('should properly bubble up errors from sass value constructors', function(done) {
       sass.render({
         data: 'div { color: foo(); }',
@@ -795,6 +879,72 @@ describe('api', function() {
         }
       }, function(error) {
         assert.ok(/Supplied value should be a string/.test(error.message));
+        done();
+      });
+    });
+
+    it('should fail when trying to set a bare number as the List item', function(done) {
+      sass.render({
+        data: 'div { color: foo(); }',
+        functions: {
+          'foo()': function() {
+            var out = new sass.types.List(1);
+            out.setValue(0, 2);
+            return out;
+          }
+        }
+      }, function(error) {
+        assert.ok(/Supplied value should be a SassValue object/.test(error.message));
+        done();
+      });
+    });
+
+    it('should fail when trying to set a bare Object as the List item', function(done) {
+      sass.render({
+        data: 'div { color: foo(); }',
+        functions: {
+          'foo()': function() {
+            var out = new sass.types.List(1);
+            out.setValue(0, {});
+            return out;
+          }
+        }
+      }, function(error) {
+        assert.ok(/A SassValue is expected as the list item/.test(error.message));
+        done();
+      });
+    });
+
+    it('should fail when trying to set a bare Object as the Map key', function(done) {
+      sass.render({
+        data: 'div { color: foo(); }',
+        functions: {
+          'foo()': function() {
+            var out = new sass.types.Map(1);
+            out.setKey(0, {});
+            out.setValue(0, new sass.types.String('aaa'));
+            return out;
+          }
+        }
+      }, function(error) {
+        assert.ok(/A SassValue is expected as a map key/.test(error.message));
+        done();
+      });
+    });
+
+    it('should fail when trying to set a bare Object as the Map value', function(done) {
+      sass.render({
+        data: 'div { color: foo(); }',
+        functions: {
+          'foo()': function() {
+            var out = new sass.types.Map(1);
+            out.setKey(0, new sass.types.String('aaa'));
+            out.setValue(0, {});
+            return out;
+          }
+        }
+      }, function(error) {
+        assert.ok(/A SassValue is expected as a map value/.test(error.message));
         done();
       });
     });
@@ -920,7 +1070,7 @@ describe('api', function() {
         file: fixture('include-files/index.scss')
       }, function(error, result) {
         assert(!error);
-        assert.deepEqual(result.stats.includedFiles, expected);
+        assert.deepEqual(result.stats.includedFiles.sort(), expected.sort());
         done();
       });
     });
@@ -1030,7 +1180,24 @@ describe('api', function() {
       done();
     });
 
+    it('should NOT compile empty data string', function(done) {
+      assert.throws(function() {
+        sass.renderSync({ data: '' });
+      }, /No input specified: provide a file name or a source string to process/ );
+      done();
+    });
+
+    it('should NOT compile without any input', function(done) {
+      assert.throws(function() {
+        sass.renderSync({});
+      }, /No input specified: provide a file name or a source string to process/);
+      done();
+    });
+
     it('should throw error for bad input', function(done) {
+      assert.throws(function() {
+         sass.renderSync('somestring');
+      });
       assert.throws(function() {
         sass.renderSync({ data: '#navbar width 80%;' });
       });
@@ -1364,11 +1531,12 @@ describe('api', function() {
         fixture('include-files/bar.scss').replace(/\\/g, '/'),
         fixture('include-files/foo.scss').replace(/\\/g, '/'),
         fixture('include-files/index.scss').replace(/\\/g, '/')
-      ];
+      ].sort();
+      var actual = result.stats.includedFiles.sort();
 
-      assert.equal(result.stats.includedFiles[0], expected[0]);
-      assert.equal(result.stats.includedFiles[1], expected[1]);
-      assert.equal(result.stats.includedFiles[2], expected[2]);
+      assert.equal(actual[0], expected[0]);
+      assert.equal(actual[1], expected[1]);
+      assert.equal(actual[2], expected[2]);
       done();
     });
 

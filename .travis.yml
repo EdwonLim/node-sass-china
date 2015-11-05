@@ -1,33 +1,68 @@
-language: node_js
-
-env: SKIP_SASS_BINARY_DOWNLOAD_FOR_CI=true
-
+language: cpp
 compiler: gcc
+sudo: false
 
-node_js:
-  - 0.10
-  - node  # will fetch the latest node.js version
-  - iojs  # will fetch the latest io.js version
+os:
+  - linux
+  - osx
+
+env:
+  global:
+    - SKIP_SASS_BINARY_DOWNLOAD_FOR_CI=true
+  matrix:
+    - export NODE_VERSION="0.10"
+    - export NODE_VERSION="0.12"
+    - export NODE_VERSION="iojs-v1.0"
+    - export NODE_VERSION="iojs-v1"
+    - export NODE_VERSION="iojs-v2"
+    - export NODE_VERSION="iojs-v3"
+    - export NODE_VERSION="4"
+    - export NODE_VERSION="5"
 
 matrix:
   fast_finish: true
-  allow_failures:
-    - node_js: iojs
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-4.7
+      - g++-4.7
 
 before_install:
-  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-  - sudo apt-get update
-  - sudo apt-get install gcc-4.7 g++-4.7
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.7 20
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.7 20
-  - g++ --version
-  - sudo apt-get update -qq
   - git submodule update --init --recursive
+  - git clone https://github.com/creationix/nvm.git ./.nvm
+  - git -C .nvm checkout "$(git -C .nvm describe --tags `git -C .nvm rev-list --tags --max-count=1`)"
+  - source ./.nvm/nvm.sh
+  - nvm install $NODE_VERSION
+  - nvm use $NODE_VERSION
+  - npm config set python `which python`
+  - if [ $TRAVIS_OS_NAME == "linux" ]; then
+      export CC="gcc-4.7";
+      export CXX="g++-4.7";
+      export LINK="gcc-4.7";
+      export LINKXX="g++-4.7";
+    fi
+  - nvm --version
+  - node --version
+  - npm --version
+  - gcc --version
+  - g++ --version
 
-after_success: npm run-script coverage
+script:
+  - npm install
+  - npm test
+
+after_success:
+  - if [ $TRAVIS_OS_NAME == "linux" ] && [ $NODE_VERSION == "4" ]; then
+      npm run-script coverage;
+    fi
 
 cache:
   directories:
+    - $HOME/.node-gyp
+    - $HOME/.npm
     - node_modules
 
 notifications:
