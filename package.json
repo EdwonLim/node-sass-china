@@ -1,26 +1,26 @@
 {
-  "name": "node-sass",
+  "name": "node-sass-china",
   "version": "4.0.0",
   "libsass": "3.4.0",
-  "description": "Wrapper around libsass",
+  "description": "Wrapper around libsass(免翻墙国情增强版)",
   "license": "MIT",
   "bugs": "https://github.com/sass/node-sass/issues",
   "homepage": "https://github.com/sass/node-sass",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sass/node-sass"
+    "url": "https://github.com/EdwonLim/node-sass-china"
   },
   "author": {
-    "name": "Andrew Nesbitt",
-    "email": "andrewnez@gmail.com",
-    "url": "http://andrew.github.com"
+    "name": "EdwonLim",
+    "email": "edwon.lim@gmail.com",
+    "url": "http://edwon.engineer/"
   },
   "engines": {
     "node": ">=0.10.0"
   },
-  "main": "lib/index.js",
+  "main": "index.js",
   "nodeSassConfig": {
-    "binarySite": "https://github.com/sass/node-sass/releases/download"
+    "binarySite": "https://npm.taobao.org/mirrors/node-sass"
   },
   "bin": {
     "node-sass": "bin/node-sass"
@@ -32,8 +32,7 @@
     "postinstall": "node scripts/build.js",
     "lint": "node_modules/.bin/eslint bin/node-sass lib scripts test",
     "test": "node_modules/.bin/mocha test/{*,**/**}.js",
-    "build": "node scripts/build.js --force",
-    "prepublish": "not-in-install && node scripts/prepublish.js || in-install"
+    "build": "node scripts/build.js --force"
   },
   "files": [
     "bin",
